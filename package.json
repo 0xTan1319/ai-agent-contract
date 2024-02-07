@@ -1,0 +1,50 @@
+{
+  "name": "virtual-contracts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PathDAO/virtual-contracts.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/PathDAO/virtual-contracts/issues"
+  },
+  "homepage": "https://github.com/PathDAO/virtual-contracts#readme",
+  "description": "",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers",
+    "@nomiclabs/hardhat-etherscan": "^3.1.8",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "ethers": "^6.9.2",
+    "hardhat": "^2.19.4",
+    "hardhat-deploy": "^0.11.45",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.1",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.2.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@account-abstraction/contracts": "^0.6.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.3",
+    "@openzeppelin/contracts": "5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.1",
+    "@openzeppelin/hardhat-upgrades": "^3.0.2",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "chai": "^4.2.0",
+    "dotenv": "^16.3.1",
+    "erc6551": "^0.3.1"
+  }
+}
