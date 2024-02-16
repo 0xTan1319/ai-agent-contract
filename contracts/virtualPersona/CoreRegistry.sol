@@ -8,7 +8,7 @@ abstract contract CoreRegistry {
     event NewCoreType(uint8 coreType, string label);
 
     constructor() {
-        coreTypes[_nextCoreType++] = "Character Core";
+        coreTypes[_nextCoreType++] = "Cognitive Core";
         coreTypes[_nextCoreType++] = "Voice and Sound Core";
         coreTypes[_nextCoreType++] = "Visual Core";
         coreTypes[_nextCoreType++] = "Domain Expertise Core";

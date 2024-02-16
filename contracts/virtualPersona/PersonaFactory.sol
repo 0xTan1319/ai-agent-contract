@@ -62,13 +62,14 @@ contract PersonaFactory is Initializable, AccessControl {
 
     mapping(uint256 => Application) private _applications;
 
+    address public gov;
+
     modifier onlyGov() {
-        require(
-            msg.sender == protocolDAO,
-            "Only protocol DAO can execute proposal"
-        );
+        require(msg.sender == gov, "Only DAO can execute proposal");
         _;
     }
+
+    event ApplicationThresholdUpdated(uint256 newThreshold);
 
     function initialize(
         address tokenImplementation_,
@@ -78,7 +79,8 @@ contract PersonaFactory is Initializable, AccessControl {
         address nft_,
         address protocolDAO_,
         uint256 applicationThreshold_,
-        uint256 maturityDuration_
+        uint256 maturityDuration_,
+        address gov_
     ) public initializer {
         tokenImplementation = tokenImplementation_;
         daoImplementation = daoImplementation_;
@@ -91,6 +93,7 @@ contract PersonaFactory is Initializable, AccessControl {
         _nextId = 1;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(WITHDRAW_ROLE, msg.sender);
+        gov = gov_;
     }
 
     function getApplication(
@@ -283,5 +286,12 @@ contract PersonaFactory is Initializable, AccessControl {
 
     function totalPersonas() public view returns (uint256) {
         return allTokens.length;
+    }
+
+    function setApplicationThreshold(
+        uint256 newThreshold
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        applicationThreshold = newThreshold;
+        emit ApplicationThresholdUpdated(newThreshold);
     }
 }
