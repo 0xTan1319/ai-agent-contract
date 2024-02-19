@@ -88,18 +88,14 @@ contract VirtualGenesisDAO is
         return 10000e18;
     }
 
-    function earlyExecute(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        bytes32 descriptionHash
-    ) public payable returns (uint256) {
-        uint256 proposalId = hashProposal(
-            targets,
-            values,
-            calldatas,
-            descriptionHash
-        );
+    function earlyExecute(uint256 proposalId) public payable returns (uint256) {
+        (
+            address[] memory targets,
+            uint256[] memory values,
+            bytes[] memory calldatas,
+            bytes32 descriptionHash
+        ) = proposalDetails(proposalId);
+
         require(
             state(proposalId) == ProposalState.Active &&
                 _quorumReached(proposalId) &&
