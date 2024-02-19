@@ -70,6 +70,7 @@ contract PersonaFactory is Initializable, AccessControl {
     }
 
     event ApplicationThresholdUpdated(uint256 newThreshold);
+    event GovUpdated(address newGov);
 
     function initialize(
         address tokenImplementation_,
@@ -293,5 +294,10 @@ contract PersonaFactory is Initializable, AccessControl {
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         applicationThreshold = newThreshold;
         emit ApplicationThresholdUpdated(newThreshold);
+    }
+
+    function setGov(address newGov) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        gov = newGov;
+        emit GovUpdated(newGov);
     }
 }

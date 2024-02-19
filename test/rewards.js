@@ -106,7 +106,8 @@ describe("Rewards", function () {
       personaNft.target,
       protocolDAO.target,
       PROPOSAL_THRESHOLD,
-      5
+      5,
+      protocolDAO.target,
     );
 
     await personaNft.grantRole(
