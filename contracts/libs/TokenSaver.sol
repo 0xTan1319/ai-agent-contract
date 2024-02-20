@@ -17,10 +17,6 @@ contract TokenSaver is AccessControl {
         _;
     }
 
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-    }
-
     function saveToken(address _token, address _receiver, uint256 _amount) external onlyTokenSaver {
         IERC20(_token).safeTransfer(_receiver, _amount);
         emit TokenSaved(_msgSender(), _receiver, _token, _amount);

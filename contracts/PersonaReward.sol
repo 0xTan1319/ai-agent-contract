@@ -14,44 +14,18 @@ import "./libs/RewardSettingsCheckpoints.sol";
 import "./contribution/IContributionNft.sol";
 import "./contribution/IServiceNft.sol";
 import "./libs/TokenSaver.sol";
+import "./IPersonaReward.sol";
+import "./virtualPersona/IVirtualIP.sol";
 
-contract PersonaReward is Initializable, AccessControl, TokenSaver {
+contract PersonaReward is
+    IPersonaReward,
+    Initializable,
+    AccessControl,
+    TokenSaver
+{
     using Math for uint256;
     using SafeERC20 for IERC20;
     using RewardSettingsCheckpoints for RewardSettingsCheckpoints.Trace;
-
-    struct MainReward {
-        uint32 blockNumber;
-        uint256 amount;
-        uint256 personaCount;
-        uint256 totalStaked;
-    }
-
-    // Virtual specific reward, the amount will be shared between validator pool and contributor pool
-    // Validator pool will be shared by validators and stakers
-    // Contributor pool will be shared by contribution NFT holders
-    struct Reward {
-        uint48 id;
-        uint32 mainIndex;
-        uint256 totalStaked;
-        uint256 totalVScore;
-        uint256 totalDatasets;
-        uint256 validatorAmount;
-        uint256 modelAmount;
-        uint256 datasetAmount;
-    }
-
-    struct Claim {
-        uint256 totalClaimed;
-        uint32 rewardCount;
-    }
-
-    struct ModelReward {
-        uint256 amount;
-        uint256 parentAmount;
-        uint256 totalClaimed;
-        uint256 totalClaimedParent;
-    }
 
     uint48 private _nextRewardId;
 
@@ -61,6 +35,7 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
     address public personaNft;
     address public contributionNft;
     address public serviceNft;
+    address public virtualIPNft;
 
     MainReward[] private _mainRewards;
     uint256 public protocolRewards;
@@ -68,7 +43,6 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
     uint16 public parentShares;
 
     RewardSettingsCheckpoints.Trace private _rewardSettings;
-    error ERC5805FutureLookup(uint256 timepoint, uint32 clock);
 
     mapping(address account => mapping(uint256 virtualId => Claim claim))
         private _claimedStakerRewards;
@@ -80,43 +54,9 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
     mapping(uint256 serviceId => ModelReward) private _modelRewards;
     mapping(uint256 datasetId => Claim) private _datasetClaims;
 
-    event NewMainReward(
-        uint32 indexed pos,
-        uint256 amount,
-        uint256 totalStaked
-    );
-    event RewardSettingsUpdated(
-        uint16 uptimeWeight,
-        uint16 stakeWeight,
-        uint16 protocolShares,
-        uint16 contributorShares,
-        uint16 stakerShares,
-        uint16 datasetShares,
-        uint16 impactShares
-    );
-    event StakeThresholdUpdated(uint256 threshold);
-    event ParentSharesUpdated(uint256 shares);
-    event StakerRewardClaimed(
-        uint256 virtualId,
-        uint256 amount,
-        address staker
-    );
-    event ValidatorRewardClaimed(
-        uint256 virtualId,
-        uint256 amount,
-        address validator
-    );
-    event ModelRewardsClaimed(
-        uint256 nftId,
-        address account,
-        uint256 total,
-        uint256 childrenAmount
-    );
-    event DatasetRewardsClaimed(uint256 nftId, address account, uint256 total);
-
-    error NotGovError();
-
     bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+
+    mapping(uint256 virtualId => IPReward) private _ipRewards;
 
     modifier onlyGov() {
         if (!hasRole(GOV_ROLE, _msgSender())) {
@@ -130,6 +70,7 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
         address personaNft_,
         address contributionNft_,
         address serviceNft_,
+        address virtualIPNft_,
         RewardSettingsCheckpoints.RewardSettings memory settings_,
         uint256 stakeThreshold_,
         uint16 parentShares_
@@ -138,21 +79,12 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
         personaNft = personaNft_;
         contributionNft = contributionNft_;
         serviceNft = serviceNft_;
+        virtualIPNft = virtualIPNft_;
         _rewardSettings.push(0, settings_);
         stakeThreshold = stakeThreshold_;
         parentShares = parentShares_;
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _nextRewardId = 1;
-    }
-
-    function setStakeThreshold(uint256 threshold) external onlyGov {
-        stakeThreshold = threshold;
-        emit StakeThresholdUpdated(threshold);
-    }
-
-    function setParentShares(uint16 shares) external onlyGov {
-        parentShares = shares;
-        emit ParentSharesUpdated(shares);
     }
 
     function getRewardSettings()
@@ -171,38 +103,6 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
             revert ERC5805FutureLookup(timepoint, currentTimepoint);
         }
         return _rewardSettings.upperLookupRecent(timepoint);
-    }
-
-    function setRewardSettings(
-        uint16 uptimeWeight_,
-        uint16 stakeWeight_,
-        uint16 protocolShares_,
-        uint16 contributorShares_,
-        uint16 stakerShares_,
-        uint16 datasetShares_,
-        uint16 impactShares_
-    ) public onlyGov {
-        _rewardSettings.push(
-            SafeCast.toUint32(block.number),
-            RewardSettingsCheckpoints.RewardSettings(
-                uptimeWeight_,
-                stakeWeight_,
-                protocolShares_,
-                contributorShares_,
-                stakerShares_,
-                datasetShares_,
-                impactShares_
-            )
-        );
-        emit RewardSettingsUpdated(
-            uptimeWeight_,
-            stakeWeight_,
-            protocolShares_,
-            contributorShares_,
-            stakerShares_,
-            datasetShares_,
-            impactShares_
-        );
     }
 
     function getMainReward(uint32 pos) public view returns (MainReward memory) {
@@ -233,7 +133,7 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
     // Validator score is calculated based on weighted uptime and votes
     function _calcValidatorScore(
         address validator,
-        uint256 personaId,
+        uint256 virtualId,
         uint256 totalStaked,
         uint256 totalUptime
     ) private view returns (uint256) {
@@ -243,7 +143,7 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
         uint256 normalizedUptimeScore = totalUptime > 0
             ? (DENOMINATOR *
                 IValidatorRegistry(personaNft).validatorScore(
-                    personaId,
+                    virtualId,
                     validator
                 )) / totalUptime
             : 0;
@@ -253,7 +153,7 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
         // Stake portion
         uint256 normalizedVoteScore = totalStaked > 0
             ? (DENOMINATOR *
-                IPersonaNft(personaNft).getVotes(personaId, validator)) /
+                IPersonaNft(personaNft).getVotes(virtualId, validator)) /
                 totalStaked
             : 0;
 
@@ -272,32 +172,32 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
         uint32 mainPos = SafeCast.toUint32(_mainRewards.length);
 
         // Get staking amount for all personas
-        for (uint256 personaId = 1; personaId <= personaCount; personaId++) {
+        for (uint256 virtualId = 1; virtualId <= personaCount; virtualId++) {
             // Get staked amount
-            uint256 totalStaked = nft.totalStaked(personaId);
+            uint256 totalStaked = nft.totalStaked(virtualId);
             if (totalStaked < stakeThreshold) {
                 continue;
             }
 
             // Calculate validator score
             uint48 rewardId = _nextRewardId++;
-            uint256 validatorCount = nft.validatorCount(personaId);
+            uint256 validatorCount = nft.validatorCount(virtualId);
             uint256 totalVScore = 0;
             for (uint256 j = 0; j < validatorCount; j++) {
-                address validator = nft.validatorAt(personaId, j);
+                address validator = nft.validatorAt(virtualId, j);
 
                 // Calculate validator score
                 uint256 validatorScore = _calcValidatorScore(
                     validator,
-                    personaId,
+                    virtualId,
                     totalStaked,
-                    nft.totalUptimeScore(personaId)
+                    nft.totalUptimeScore(virtualId)
                 );
                 totalVScore += validatorScore;
                 _validatorScores[validator][rewardId] = validatorScore;
             }
 
-            _rewards[personaId].push(
+            _rewards[virtualId].push(
                 Reward({
                     id: rewardId,
                     mainIndex: mainPos,
@@ -306,7 +206,8 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
                     totalDatasets: 0,
                     validatorAmount: 0,
                     modelAmount: 0,
-                    datasetAmount: 0
+                    datasetAmount: 0,
+                    ipAmount: 0
                 })
             );
             grandTotalStaked += totalStaked;
@@ -324,18 +225,18 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
     }
 
     function _populateRewardAmounts(
-        uint256 personaId,
+        uint256 virtualId,
         uint256 mainRewardIndex,
         RewardSettingsCheckpoints.RewardSettings memory settings
     ) private {
-        if (_rewards[personaId].length == 0) {
+        if (_rewards[virtualId].length == 0) {
             return;
         }
 
         MainReward memory mainReward = _mainRewards[mainRewardIndex];
 
-        Reward storage reward = _rewards[personaId][
-            _rewards[personaId].length - 1
+        Reward storage reward = _rewards[virtualId][
+            _rewards[virtualId].length - 1
         ];
         if (reward.mainIndex != mainRewardIndex) {
             return;
@@ -343,21 +244,30 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
 
         uint256 amount = (mainReward.amount * reward.totalStaked) /
             mainReward.totalStaked;
+
+        if (IVirtualIP(virtualIPNft).isOwned(virtualId)) {
+            reward.ipAmount =
+                (amount * uint256(settings.ipShares)) /
+                DENOMINATOR;
+            _ipRewards[virtualId].amount += reward.ipAmount;
+            amount -= reward.ipAmount;
+        }
+
         uint256 contributorAmount = (((amount * reward.totalStaked) /
             mainReward.totalStaked) * uint256(settings.contributorShares)) /
             DENOMINATOR;
         reward.validatorAmount = amount - contributorAmount;
 
-        _distributeContributorRewards(personaId, contributorAmount, settings);
+        _distributeContributorRewards(virtualId, contributorAmount, settings);
     }
 
     function _distributeImpactRewards(
-        uint256 personaId,
+        uint256 virtualId,
         uint256 amount,
         uint256 totalMaturity
     ) private {
         uint256[] memory services = IPersonaNft(personaNft).getAllServices(
-            personaId
+            virtualId
         );
         uint256 serviceId;
         uint256 impact;
@@ -393,7 +303,7 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
     }
 
     function _distributeContributorRewards(
-        uint256 personaId,
+        uint256 virtualId,
         uint256 amount,
         RewardSettingsCheckpoints.RewardSettings memory settings
     ) private {
@@ -401,18 +311,18 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
             DENOMINATOR;
 
         uint8[] memory coreTypes = IPersonaNft(personaNft)
-            .virtualInfo(personaId)
+            .virtualInfo(virtualId)
             .coreTypes;
         uint256[] memory currentServices = new uint256[](coreTypes.length);
         uint256 totalMaturity = 0;
         uint8 totalModels = 0;
         IServiceNft serviceNftContract = IServiceNft(serviceNft);
-        Reward storage reward = _rewards[personaId][
-            _rewards[personaId].length - 1
+        Reward storage reward = _rewards[virtualId][
+            _rewards[virtualId].length - 1
         ];
         for (uint i = 0; i < coreTypes.length; i++) {
             currentServices[i] = serviceNftContract.getCoreService(
-                personaId,
+                virtualId,
                 coreTypes[i]
             );
             if (currentServices[i] > 0) {
@@ -422,23 +332,26 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
                 totalModels++;
             }
             reward.totalDatasets += serviceNftContract.totalCoreDatasets(
-                personaId,
+                virtualId,
                 coreTypes[i]
             );
         }
-        _distributeImpactRewards(personaId, impactAmount, totalMaturity);
+        if (totalMaturity > 0) {
+            _distributeImpactRewards(virtualId, impactAmount, totalMaturity);
+        }
         uint256 utilAmount = amount - impactAmount;
 
         reward.datasetAmount =
             (utilAmount * uint256(settings.datasetShares)) /
             DENOMINATOR;
-
-        _distributeModelUtilizationRewards(
-            (utilAmount - reward.datasetAmount),
-            currentServices,
-            uint8(coreTypes.length),
-            totalModels
-        );
+        if (totalModels > 0) {
+            _distributeModelUtilizationRewards(
+                (utilAmount - reward.datasetAmount),
+                currentServices,
+                uint8(coreTypes.length),
+                totalModels
+            );
+        }
     }
 
     function distributeRewards(uint256 amount) public onlyGov returns (uint32) {
@@ -458,8 +371,8 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
         uint32 mainRewardIndex = SafeCast.toUint32(_mainRewards.length - 1);
         RewardSettingsCheckpoints.RewardSettings
             memory settings = getRewardSettings();
-        for (uint256 personaId = 1; personaId <= personaCount; personaId++) {
-            _populateRewardAmounts(personaId, mainRewardIndex, settings);
+        for (uint256 virtualId = 1; virtualId <= personaCount; virtualId++) {
+            _populateRewardAmounts(virtualId, mainRewardIndex, settings);
         }
 
         return SafeCast.toUint32(_mainRewards.length - 1);
@@ -818,5 +731,91 @@ contract PersonaReward is Initializable, AccessControl, TokenSaver {
         for (uint256 i = 0; i < modelNftIds.length; i++) {
             claimModelRewards(modelNftIds[i]);
         }
+    }
+
+    function getClaimableIPRewards(
+        uint256 virtualId
+    ) public view returns (uint256) {
+        IPReward memory reward = _ipRewards[virtualId];
+        return reward.amount - reward.totalClaimed;
+    }
+
+    function claimIPRewards(uint256 virtualId) public {
+        address account = _msgSender();
+        IPReward storage reward = _ipRewards[virtualId];
+        uint256 total = reward.amount - reward.totalClaimed;
+        if (IERC721(virtualIPNft).ownerOf(virtualId) != account) {
+            revert NotOwnerError();
+        }
+
+        reward.totalClaimed += total;
+        IERC20(rewardToken).safeTransfer(account, total);
+        emit IPRewardsClaimed(virtualId, account, total);
+    }
+
+    function setStakeThreshold(uint256 threshold) external onlyGov {
+        stakeThreshold = threshold;
+        emit StakeThresholdUpdated(threshold);
+    }
+
+    function setParentShares(uint16 shares) external onlyGov {
+        parentShares = shares;
+        emit ParentSharesUpdated(shares);
+    }
+
+    function setRewardSettings(
+        uint16 uptimeWeight_,
+        uint16 stakeWeight_,
+        uint16 protocolShares_,
+        uint16 contributorShares_,
+        uint16 stakerShares_,
+        uint16 datasetShares_,
+        uint16 impactShares_,
+        uint16 ipShares_
+    ) public onlyGov {
+        _rewardSettings.push(
+            SafeCast.toUint32(block.number),
+            RewardSettingsCheckpoints.RewardSettings(
+                uptimeWeight_,
+                stakeWeight_,
+                protocolShares_,
+                contributorShares_,
+                stakerShares_,
+                datasetShares_,
+                impactShares_,
+                ipShares_
+            )
+        );
+        emit RewardSettingsUpdated(
+            uptimeWeight_,
+            stakeWeight_,
+            protocolShares_,
+            contributorShares_,
+            stakerShares_,
+            datasetShares_,
+            impactShares_,
+            ipShares_
+        );
+    }
+
+    function updateRefContracts(
+        address rewardToken_,
+        address personaNft_,
+        address contributionNft_,
+        address serviceNft_,
+        address virtualIPNft_
+    ) external onlyGov {
+        rewardToken = rewardToken_;
+        personaNft = personaNft_;
+        contributionNft = contributionNft_;
+        serviceNft = serviceNft_;
+        virtualIPNft = virtualIPNft_;
+        emit RefContractsUpdated(
+            rewardToken_,
+            personaNft_,
+            contributionNft_,
+            serviceNft_,
+            virtualIPNft_
+        );
     }
 }
