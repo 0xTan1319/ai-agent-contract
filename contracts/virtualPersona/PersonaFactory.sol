@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./IPersonaToken.sol";
 import "./IPersonaDAO.sol";
 import "./IPersonaNft.sol";
+import "./IVirtualIP.sol";
 import "../libs/IERC6551Registry.sol";
 
 contract PersonaFactory is Initializable, AccessControl {
@@ -58,6 +59,7 @@ contract PersonaFactory is Initializable, AccessControl {
         address tbaImplementation;
         uint32 daoVotingPeriod;
         uint256 daoThreshold;
+        bool hasIP;
     }
 
     mapping(uint256 => Application) private _applications;
@@ -70,6 +72,12 @@ contract PersonaFactory is Initializable, AccessControl {
     }
 
     event ApplicationThresholdUpdated(uint256 newThreshold);
+    event GovUpdated(address newGov);
+
+    address virtualIP;
+    event VirtualIPUpdated(address newVirtualIP);
+
+    address private _vault; // Vault to hold all Virtual NFTs
 
     function initialize(
         address tokenImplementation_,
@@ -80,7 +88,9 @@ contract PersonaFactory is Initializable, AccessControl {
         address protocolDAO_,
         uint256 applicationThreshold_,
         uint256 maturityDuration_,
-        address gov_
+        address gov_,
+        address virtualIP_,
+        address vault_
     ) public initializer {
         tokenImplementation = tokenImplementation_;
         daoImplementation = daoImplementation_;
@@ -94,6 +104,8 @@ contract PersonaFactory is Initializable, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(WITHDRAW_ROLE, msg.sender);
         gov = gov_;
+        virtualIP = virtualIP_;
+        _vault = vault_;
     }
 
     function getApplication(
@@ -118,7 +130,8 @@ contract PersonaFactory is Initializable, AccessControl {
         bytes32 tbaSalt,
         address tbaImplementation,
         uint32 daoVotingPeriod,
-        uint256 daoThreshold
+        uint256 daoThreshold,
+        bool hasIP
     ) external returns (uint256) {
         address sender = msg.sender;
         require(
@@ -155,7 +168,8 @@ contract PersonaFactory is Initializable, AccessControl {
             tbaSalt,
             tbaImplementation,
             daoVotingPeriod,
-            daoThreshold
+            daoThreshold,
+            hasIP
         );
         _applications[id] = application;
         emit NewApplication(id);
@@ -212,7 +226,7 @@ contract PersonaFactory is Initializable, AccessControl {
             )
         );
         uint256 virtualId = IPersonaNft(nft).mint(
-            protocolDAO,
+            _vault,
             application.tokenURI,
             dao,
             application.proposer,
@@ -242,6 +256,10 @@ contract PersonaFactory is Initializable, AccessControl {
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Executed;
         application.virtualId = virtualId;
+
+        if (application.hasIP) {
+            IVirtualIP(virtualIP).safeMint(tbaAddress, virtualId);
+        }
 
         emit NewPersona(virtualId, token, dao, tbaAddress);
     }
@@ -293,5 +311,23 @@ contract PersonaFactory is Initializable, AccessControl {
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         applicationThreshold = newThreshold;
         emit ApplicationThresholdUpdated(newThreshold);
+    }
+
+    function setGov(address newGov) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        gov = newGov;
+        emit GovUpdated(newGov);
+    }
+
+    function setVirtualIP(
+        address newVirtualIP
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        virtualIP = newVirtualIP;
+        emit VirtualIPUpdated(newVirtualIP);
+    }
+
+    function setVault(
+        address newVault
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _vault = newVault;
     }
 }
