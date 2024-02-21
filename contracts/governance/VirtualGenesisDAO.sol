@@ -117,4 +117,12 @@ contract VirtualGenesisDAO is
 
         return proposalId;
     }
+
+    // Handle early execution
+    function state(uint256 proposalId) public view override returns (ProposalState) {
+        if (_earlyExecutions[proposalId]) {
+            return ProposalState.Executed;
+        }
+        return super.state(proposalId);
+    }
 }
