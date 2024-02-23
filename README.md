@@ -15,22 +15,22 @@
 | AgentToken | This is implementation contract for VIRTUAL staking. AgentFactory will clone this during VIRTUAL instantiation. Staked token is non-transferable. | - | N |
 | AgentDAO | This is implementation contract for VIRTUAL specific DAO. AgentFactory will clone this during VIRTUAL instantiation. It holds the maturity score for each core service. | - | N |
 | AgentReward | This is reward distribution center. | Roles: GOV_ROLE, TOKEN_SAVER_ROLE | Y |
-| TimeLockStaking | Allows user to stake their $VIRTUAL in exchange for $sVIRTUAL | Roles: GOV_ROLE, TOKEN_SAVER_ROLE | N |
-| Virtual | $VIRTUAL token | Ownable | N |
+| TimeLockStaking | Allows user to stake their VIRTUAL in exchange for sVIRTUAL | Roles: GOV_ROLE, TOKEN_SAVER_ROLE | N |
+| Virtual | VIRTUAL token | Ownable | N |
 | Airdrop | Airdrop token to holders | - | N |
 
 
 # Main Activities
 ## VIRTUAL Genesis
 1. Submit a new application at **AgentFactory** 
-	a. It will transfer $VIRTUAL to AgentFactory
+	a. It will transfer VIRTUAL to AgentFactory
 2. Propose at **VirtualGenesisDAO** (action = ```VirtualFactory.executeApplication``` )
 3. Start voting at **VirtualGenesisDAO**
 4. Execute proposal at  **VirtualGenesisDAO**  , it will do following:
 	a. Clone **AgentToken**
 	b. Clone **AgentDAO**
 	c. Mint **AgentNft**
-	d. Stake $VIRTUAL -> $PERSONA (depending on the symbol sent to application)
+	d. Stake VIRTUAL -> $PERSONA (depending on the symbol sent to application)
 	e. Create **TBA** with **AgentNft**
 	
 
@@ -49,7 +49,7 @@
 ## Distribute Reward
 1. On daily basis, protocol backend will conclude daily profits into a single amount.
 2. Protocol backend calls **AgentReward**.distributeRewards , triggering following:
-	a. Transfer $VIRTUAL into **AgentReward** 
+	a. Transfer VIRTUAL into **AgentReward** 
 	b. Account & update claimable amounts for: Protocol, Stakers, Validators, Dataset Contributors, Model Contributors
 	
 	
@@ -59,5 +59,5 @@
 
 
 ## Staking VIRTUAL
-1. Call **AgentToken**.stake , pass in the validator that you would like to delegate your voting power to. It will take in $sVIRTUAL and mint $*PERSONA* to you.
-2. Call **AgentToken**.withdraw to withdraw , will burn your $*PERSONA* and return $sVIRTUAL to you.
+1. Call **AgentToken**.stake , pass in the validator that you would like to delegate your voting power to. It will take in sVIRTUAL and mint $*PERSONA* to you.
+2. Call **AgentToken**.withdraw to withdraw , will burn your $*PERSONA* and return sVIRTUAL to you.
