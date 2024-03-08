@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/governance/IGovernor.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -14,6 +15,8 @@ import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
 
 contract AgentFactory is Initializable, AccessControl {
+    using SafeERC20 for IERC20;
+
     uint256 private _nextId;
     address public tokenImplementation;
     address public daoImplementation;
@@ -74,6 +77,15 @@ contract AgentFactory is Initializable, AccessControl {
 
     address private _vault; // Vault to hold all Virtual NFTs
 
+    bool internal locked;
+
+    modifier noReentrant() {
+        require(!locked, "cannot reenter");
+        locked = true;
+        _;
+        locked = false;
+    }
+
     function initialize(
         address tokenImplementation_,
         address daoImplementation_,
@@ -127,7 +139,7 @@ contract AgentFactory is Initializable, AccessControl {
         );
         require(cores.length > 0, "Cores must be provided");
 
-        IERC20(assetToken).transferFrom(
+        IERC20(assetToken).safeTransferFrom(
             sender,
             address(this),
             applicationThreshold
@@ -158,7 +170,7 @@ contract AgentFactory is Initializable, AccessControl {
         return id;
     }
 
-    function withdraw(uint256 id) public {
+    function withdraw(uint256 id) public noReentrant {
         Application storage application = _applications[id];
 
         require(
@@ -177,12 +189,13 @@ contract AgentFactory is Initializable, AccessControl {
             "Application is not matured yet"
         );
 
-        IERC20(assetToken).transfer(
+        application.withdrawableAmount = 0;
+        application.status = ApplicationStatus.Withdrawn;
+
+        IERC20(assetToken).safeTransfer(
             application.proposer,
             application.withdrawableAmount
         );
-        application.withdrawableAmount = 0;
-        application.status = ApplicationStatus.Withdrawn;
     }
 
     function executeApplication(uint256 id) public onlyGov {
@@ -214,7 +227,7 @@ contract AgentFactory is Initializable, AccessControl {
             application.cores
         );
 
-        IERC20(assetToken).approve(token, application.withdrawableAmount);
+        IERC20(assetToken).forceApprove(token, application.withdrawableAmount);
         IAgentToken(token).stake(
             application.withdrawableAmount,
             application.proposer,
@@ -295,9 +308,7 @@ contract AgentFactory is Initializable, AccessControl {
         emit GovUpdated(newGov);
     }
 
-    function setVault(
-        address newVault
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setVault(address newVault) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _vault = newVault;
     }
 
