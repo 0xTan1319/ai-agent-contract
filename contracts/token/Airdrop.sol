@@ -1,11 +1,9 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract Airdrop {
-    using SafeERC20 for IERC20;
-    
+
     /**
      *
      * @param _token ERC20 token to airdrop
@@ -19,15 +17,15 @@ contract Airdrop {
         uint256[] calldata _amounts,
         uint256 _total
     ) external {
-        // bytes selector for safeTransferFrom(address,address,uint256)
-        bytes4 safeFransferFrom = 0x42842e0e;
-        // bytes selector for safeTransfer(address,uint256)
-        bytes4 safeTransfer = 0x423f6cef;
+        // bytes selector for transferFrom(address,address,uint256)
+        bytes4 transferFrom = 0x23b872dd;
+        // bytes selector for transfer(address,uint256)
+        bytes4 transfer = 0xa9059cbb;
 
         assembly {
             // store transferFrom selector
             let transferFromData := add(0x20, mload(0x40))
-            mstore(transferFromData, safeFransferFrom)
+            mstore(transferFromData, transferFrom)
             // store caller address
             mstore(add(transferFromData, 0x04), caller())
             // store address
@@ -35,23 +33,19 @@ contract Airdrop {
             // store _total
             mstore(add(transferFromData, 0x44), _total)
             // call transferFrom for _total
-            let successTransferFrom := call(
-                gas(),
-                _token,
-                0,
-                transferFromData,
-                0x64,
-                0,
-                0
-            )
-            // revert if call fails
-            if iszero(successTransferFrom) {
+
+            if iszero(
+                and( // The arguments of `and` are evaluated from right to left.
+                    or(eq(mload(0x00), 1), iszero(returndatasize())), // Returned 1 or nothing.
+                    call(gas(), _token, 0, transferFromData, 0x64, 0x00, 0x20)
+                )
+            ) {
                 revert(0, 0)
             }
 
             // store transfer selector
             let transferData := add(0x20, mload(0x40))
-            mstore(transferData, safeTransfer)
+            mstore(transferData, transfer)
 
             // store length of _recipients
             let sz := _amounts.length
@@ -80,19 +74,13 @@ contract Airdrop {
                     amt
                 )
                 // call transfer for _amounts[i] to _recipients[i]
-                let successTransfer := call(
-                    gas(),
-                    _token,
-                    0,
-                    transferData,
-                    0x44,
-                    0,
-                    0
-                )
-                // revert if call fails
-
-                
-                if iszero(successTransfer) {
+                // Perform the transfer, reverting upon failure.
+                if iszero(
+                    and( // The arguments of `and` are evaluated from right to left.
+                        or(eq(mload(0x00), 1), iszero(returndatasize())), // Returned 1 or nothing.
+                        call(gas(), _token, 0, transferData, 0x44, 0x00, 0x20)
+                    )
+                ) {
                     revert(0, 0)
                 }  
             }
