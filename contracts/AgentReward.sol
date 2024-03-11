@@ -254,6 +254,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         // Calculate weighted validator shares
         uint256 validatorCount = nft.validatorCount(virtualId);
         uint256 totalProposals = nft.totalProposals(virtualId);
+
         for (uint256 i = 0; i < validatorCount; i++) {
             address validator = nft.validatorAt(virtualId, i);
 
@@ -263,8 +264,10 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
             uint256 validatorRewards = (amount * votes) / totalStaked;
 
             // Calc validator reward based on participation rate
-            uint256 participationReward = (validatorRewards *
-                nft.validatorScore(virtualId, validator)) / totalProposals;
+            uint256 participationReward = totalProposals == 0
+                ? 0
+                : (validatorRewards *
+                    nft.validatorScore(virtualId, validator)) / totalProposals;
             _validatorRewards[validator][rewardId] = participationReward;
 
             validatorPoolRewards += validatorRewards - participationReward;
