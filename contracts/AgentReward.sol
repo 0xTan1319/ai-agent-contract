@@ -457,7 +457,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
 
     function _getClaimableServiceRewards(
         uint256 nftId
-    ) public view returns (uint256 total) {
+    ) internal view returns (uint256 total) {
         ServiceReward memory serviceReward = getServiceReward(nftId);
         total = serviceReward.amount - serviceReward.totalClaimed;
         uint256 childrenAmount = getChildrenRewards(nftId);
