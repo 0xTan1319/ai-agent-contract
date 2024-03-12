@@ -522,7 +522,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         return _serviceRewards[nftId];
     }
 
-    function _claimServiceRewards(uint256 nftId) public {
+    function _claimServiceRewards(uint256 nftId) internal {
         address account = _msgSender();
         require(
             IERC721(contributionNft).ownerOf(nftId) == account,
