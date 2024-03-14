@@ -43,6 +43,18 @@ describe("Staking", function () {
     this.signers = signers;
   });
 
+  it("should give correct bonus for 6months", async function () {
+    const { token, staking } = await loadFixture(deployBaseContracts);
+
+    const [account1, account2] = this.accounts;
+    await token.approve(staking.target, parseEther("100"));
+    const oneYear = 86400 * 365;
+
+    await staking.deposit(parseEther("100"), Math.floor(oneYear / 2), account2);
+    const balance = await staking.balanceOf(account2);
+    expect(balance).to.equal(parseEther("150"));
+  });
+
   it("should give correct bonus for year 1", async function () {
     const { token, staking } = await loadFixture(deployBaseContracts);
 
@@ -52,7 +64,7 @@ describe("Staking", function () {
 
     await staking.deposit(parseEther("100"), oneYear, account2);
     const balance = await staking.balanceOf(account2);
-    expect(balance).to.equal(parseEther("300"));
+    expect(balance).to.equal(parseEther("200"));
   });
 
   it("should give correct bonus for year 2", async function () {
@@ -64,7 +76,7 @@ describe("Staking", function () {
 
     await staking.deposit(parseEther("100"), oneYear * 2, account2);
     const balance = await staking.balanceOf(account2);
-    expect(balance).to.equal(parseEther("500"));
+    expect(balance).to.equal(parseEther("400"));
   });
 
   it("should give correct bonus for year 3", async function () {
@@ -76,7 +88,19 @@ describe("Staking", function () {
 
     await staking.deposit(parseEther("100"), oneYear * 3, account2);
     const balance = await staking.balanceOf(account2);
-    expect(balance).to.equal(parseEther("900"));
+    expect(balance).to.equal(parseEther("800"));
+  });
+
+  it("should give correct bonus for year 3.5", async function () {
+    const { token, staking } = await loadFixture(deployBaseContracts);
+
+    const [account1, account2] = this.accounts;
+    await token.approve(staking.target, parseEther("100"));
+    const oneYear = 86400 * 365;
+
+    await staking.deposit(parseEther("100"), Math.floor(oneYear * 3.5), account2);
+    const balance = await staking.balanceOf(account2);
+    expect(balance).to.equal(parseEther("1200"));
   });
 
   it("should give correct bonus for year 4", async function () {
@@ -88,7 +112,7 @@ describe("Staking", function () {
 
     await staking.deposit(parseEther("100"), oneYear * 4, account2);
     const balance = await staking.balanceOf(account2);
-    expect(balance).to.equal(parseEther("1700"));
+    expect(balance).to.equal(parseEther("1600"));
   });
 
   it("should allow adjustDeposits", async function() {
