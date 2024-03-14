@@ -2,7 +2,7 @@ module.exports = [
     'xVIRTUAL',
     'xVIRTUAL',
     process.env.BRIDGED_TOKEN,
-    100000000000, // maxBonus
-    1000, // maxLockDuration
-    [1, 1] // curve
+    "16000000000000000000", // maxBonus
+    126144000, // maxLockDuration
+    ["1000000000000000000", "2000000000000000000", "4000000000000000000", "8000000000000000000", "16000000000000000000"] // curve
 ];
