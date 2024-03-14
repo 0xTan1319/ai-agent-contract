@@ -90,4 +90,14 @@ describe("Staking", function () {
     const balance = await staking.balanceOf(account2);
     expect(balance).to.equal(parseEther("1700"));
   });
+
+  it("should allow adjustDeposits", async function() {
+    const { token, staking } = await loadFixture(deployBaseContracts);
+    const [deployer, admin] = this.signers
+    await expect(staking.adjustAdminUnlock()).to.be.reverted;
+    await expect(staking.connect(admin).adjustAdminUnlock()).to.be.reverted;
+
+    await staking.grantRole(await staking.GOV_ROLE(), admin.address);
+    await expect(staking.connect(admin).adjustAdminUnlock()).to.be.fulfilled;
+  })
 });
