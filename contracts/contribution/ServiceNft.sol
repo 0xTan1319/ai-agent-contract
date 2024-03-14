@@ -50,6 +50,7 @@ contract ServiceNft is
         uint16 initialDatasetImpactWeight
     ) public initializer {
         __ERC721_init("Service", "VS");
+        __Ownable_init(_msgSender());
         personaNft = initialAgentNft;
         contributionNft = initialContributionNft;
         datasetImpactWeight = initialDatasetImpactWeight;
