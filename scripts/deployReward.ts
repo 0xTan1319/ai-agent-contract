@@ -18,7 +18,7 @@ import { ethers, upgrades } from "hardhat";
           stakeThreshold: process.env.REWARD_STAKE_THRESHOLD,
         },
       ],
-      { initialOwner: process.env.ADMIN }
+      { initialOwner: process.env.CONTRACT_CONTROLLER }
     );
     await contract.waitForDeployment();
     const address = await contract.getAddress()
