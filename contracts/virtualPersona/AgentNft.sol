@@ -55,7 +55,7 @@ contract AgentNft is
     }
 
     function initialize(address defaultAdmin) public initializer {
-        __ERC721_init("Persona", "PERSONA");
+        __ERC721_init("Agent", "AGENT");
         __ERC721URIStorage_init();
         __CoreRegistry_init();
         __ValidatorRegistry_init(
