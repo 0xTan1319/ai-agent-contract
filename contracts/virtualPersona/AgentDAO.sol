@@ -49,7 +49,7 @@ contract AgentDAO is
         __GovernorVotesQuorumFraction_init(5100);
         __GovernorCountingSimple_init();
         __GovernorStorage_init();
-    
+
         _contributionNft = contributionNft;
     }
 
@@ -171,7 +171,7 @@ contract AgentDAO is
                 SafeCast.toUint48(block.number),
                 SafeCast.toUint208(scoreOf(account)) + 1
             );
-            if (params.length > 0) {
+            if (params.length > 0 && support == 1) {
                 _updateMaturity(account, proposalId, weight, params);
             }
         }
@@ -191,15 +191,16 @@ contract AgentDAO is
             return;
         }
 
+        bool isModel = IContributionNft(_contributionNft).isModel(proposalId);
+        if (!isModel) {
+            return;
+        }
+
         (uint256 maturity, uint8[] memory votes) = abi.decode(
             params,
             (uint256, uint8[])
         );
-
-        bool isModel = IContributionNft(_contributionNft).isModel(proposalId);
-        if (isModel) {
-            _proposalMaturities[proposalId] += (maturity * weight);
-        }
+        _proposalMaturities[proposalId] += (maturity * weight);
 
         emit ValidatorEloRating(proposalId, account, maturity, votes);
     }
