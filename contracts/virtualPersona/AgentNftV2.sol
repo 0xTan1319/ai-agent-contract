@@ -15,7 +15,7 @@ import "./CoreRegistry.sol";
 import "./ValidatorRegistry.sol";
 import "./IAgentDAO.sol";
 
-contract AgentNft is
+contract AgentNftV2 is
     IAgentNft,
     Initializable,
     ERC721Upgradeable,
@@ -49,6 +49,14 @@ contract AgentNft is
     address private _contributionNft;
     address private _serviceNft;
 
+    // V2 Storage
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    mapping(uint256 => bool) private _blacklists;
+    mapping(uint256 => VirtualLP) public virtualLPs;
+    address private _eloCalculator;
+
+    event AgentBlacklisted(uint256 indexed virtualId, bool value);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -66,6 +74,7 @@ contract AgentNft is
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(VALIDATOR_ADMIN_ROLE, defaultAdmin);
+        _grantRole(ADMIN_ROLE, defaultAdmin);
         _nextVirtualId = 1;
     }
 
@@ -77,14 +86,21 @@ contract AgentNft is
         _serviceNft = serviceNft_;
     }
 
+    function nextVirtualId() public view returns (uint256) {
+        return _nextVirtualId;
+    }
+
     function mint(
+        uint256 virtualId,
         address to,
         string memory newTokenURI,
         address payable theDAO,
         address founder,
-        uint8[] memory coreTypes
+        uint8[] memory coreTypes,
+        address pool,
+        address token
     ) external onlyRole(MINTER_ROLE) returns (uint256) {
-        uint256 virtualId = _nextVirtualId++;
+        _nextVirtualId++;
         _mint(to, virtualId);
         _setTokenURI(virtualId, newTokenURI);
         VirtualInfo storage info = virtualInfos[virtualId];
@@ -92,10 +108,14 @@ contract AgentNft is
         info.coreTypes = coreTypes;
         info.founder = founder;
         IERC5805 daoToken = GovernorVotes(theDAO).token();
-        info.token = address(daoToken);
+        info.token = token;
+
+        VirtualLP storage lp = virtualLPs[virtualId];
+        lp.pool = pool;
+        lp.veToken = address(daoToken);
+
         _stakingTokenToVirtualId[address(daoToken)] = virtualId;
         _addValidator(virtualId, founder);
-        _initValidatorScore(virtualId, founder);
         return virtualId;
     }
 
@@ -111,6 +131,12 @@ contract AgentNft is
         return virtualInfos[virtualId];
     }
 
+    function virtualLP(
+        uint256 virtualId
+    ) public view returns (VirtualLP memory) {
+        return virtualLPs[virtualId];
+    }
+
     // Get VIRTUAL ID of a staking token
     function stakingTokenToVirtualId(
         address stakingToken
@@ -118,11 +144,15 @@ contract AgentNft is
         return _stakingTokenToVirtualId[stakingToken];
     }
 
-    function addValidator(
-        uint256 virtualId,
-        address validator
-    ) public onlyRole(VALIDATOR_ADMIN_ROLE) {
+    function addValidator(uint256 virtualId, address validator) public {
+        if (isValidator(virtualId, validator)) {
+            return;
+        }
         _addValidator(virtualId, validator);
+        _initValidatorScore(virtualId, validator);
+    }
+
+    function initValidatorScore(uint256 virtualId, address validator) public {
         _initValidatorScore(virtualId, validator);
     }
 
@@ -247,5 +277,51 @@ contract AgentNft is
 
     function totalSupply() public view returns (uint256) {
         return _nextVirtualId - 1;
+    }
+
+    function isBlacklisted(uint256 virtualId) public view returns (bool) {
+        return _blacklists[virtualId];
+    }
+
+    function setBlacklist(
+        uint256 virtualId,
+        bool value
+    ) public onlyRole(ADMIN_ROLE) {
+        _blacklists[virtualId] = value;
+        emit AgentBlacklisted(virtualId, value);
+    }
+
+    function migrateScoreFunctions() public onlyRole(ADMIN_ROLE) {
+        _migrateScoreFunctions(
+            _validatorScoreOf,
+            totalProposals,
+            _getPastValidatorScore
+        );
+    }
+
+    function setEloCalculator(
+        address eloCalculator
+    ) public onlyRole(ADMIN_ROLE) {
+        _eloCalculator = eloCalculator;
+    }
+
+    function getEloCalculator() public view returns (address) {
+        return _eloCalculator;
+    }
+
+    function migrateVirtual(
+        uint256 virtualId,
+        address dao,
+        address token,
+        address pool,
+        address veToken
+    ) public onlyRole(ADMIN_ROLE) {
+        VirtualInfo storage info = virtualInfos[virtualId];
+        info.dao = dao;
+        info.token = token;
+
+        VirtualLP storage lp = virtualLPs[virtualId];
+        lp.pool = pool;
+        lp.veToken = veToken;
     }
 }

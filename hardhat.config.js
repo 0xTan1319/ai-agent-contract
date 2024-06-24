@@ -4,6 +4,7 @@ require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
 require("@openzeppelin/hardhat-upgrades");
 require("@fireblocks/hardhat-fireblocks");
+
 const { ApiBaseUrl } = require("@fireblocks/fireblocks-web3-provider");
 
 module.exports = {
@@ -72,6 +73,9 @@ module.exports = {
         vaultAccountIds: process.env.FIREBLOCKS_VAULT_ACCOUNT_IDS,
       },
     },
+    local:{
+      url: "http://127.0.0.1:8545"
+    },
     polygon: {
       url: "https://rpc-mainnet.maticvigil.com/",
       accounts: [process.env.PRIVATE_KEY],
@@ -84,8 +88,5 @@ module.exports = {
       url: "https://rpc.ankr.com/eth_goerli",
       accounts: [process.env.PRIVATE_KEY],
     },
-  },
-  sourcify: {
-    enabled: true,
-  },
+  }
 };

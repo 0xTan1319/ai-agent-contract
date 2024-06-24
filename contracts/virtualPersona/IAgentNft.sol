@@ -5,7 +5,7 @@ import "./IValidatorRegistry.sol";
 
 interface IAgentNft is IValidatorRegistry {
     struct VirtualInfo {
-        address dao; // Persona DAO can update the persona metadata
+        address dao; // Agent DAO can update the agent metadata
         address token;
         address founder;
         address tba; // Token Bound Address
@@ -14,12 +14,20 @@ interface IAgentNft is IValidatorRegistry {
 
     event CoresUpdated(uint256 virtualId, uint8[] coreTypes);
 
+    struct VirtualLP {
+        address pool; // Liquidity pool for the agent
+        address veToken; // Voting escrow token
+    }
+
     function mint(
+        uint256 id,
         address to,
         string memory newTokenURI,
         address payable theDAO,
         address founder,
-        uint8[] memory coreTypes
+        uint8[] memory coreTypes,
+        address pool,
+        address token
     ) external returns (uint256);
 
     function stakingTokenToVirtualId(
@@ -31,6 +39,10 @@ interface IAgentNft is IValidatorRegistry {
     function virtualInfo(
         uint256 virtualId
     ) external view returns (VirtualInfo memory);
+
+    function virtualLP(
+        uint256 virtualId
+    ) external view returns (VirtualLP memory);
 
     function totalSupply() external view returns (uint256);
 
@@ -50,4 +62,10 @@ interface IAgentNft is IValidatorRegistry {
     function getAllServices(
         uint256 virtualId
     ) external view returns (uint256[] memory);
+
+    function nextVirtualId() external view returns (uint256);
+
+    function isBlacklisted(uint256 virtualId) external view returns (bool);
+
+    function getEloCalculator() external view returns (address);
 }

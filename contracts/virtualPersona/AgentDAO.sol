@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/governance/GovernorUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorSettingsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorStorageUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesQuorumFractionUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "./IAgentDAO.sol";
@@ -12,10 +10,12 @@ import "./GovernorCountingSimpleUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "../contribution/IContributionNft.sol";
+import "./IEloCalculator.sol";
+import "../contribution/IServiceNft.sol";
+import "./IAgentNft.sol";
 
 contract AgentDAO is
     IAgentDAO,
-    GovernorUpgradeable,
     GovernorSettingsUpgradeable,
     GovernorCountingSimpleUpgradeable,
     GovernorStorageUpgradeable,
@@ -31,6 +31,10 @@ contract AgentDAO is
 
     error ERC5805FutureLookup(uint256 timepoint, uint48 clock);
 
+    uint256 private _totalScore;
+
+    address private _agentNft;
+
     constructor() {
         _disableInitializers();
     }
@@ -38,7 +42,7 @@ contract AgentDAO is
     function initialize(
         string memory name,
         IVotes token,
-        address contributionNft,
+        address agentNft,
         uint256 threshold,
         uint32 votingPeriod_
     ) external initializer {
@@ -50,7 +54,7 @@ contract AgentDAO is
         __GovernorCountingSimple_init();
         __GovernorStorage_init();
 
-        _contributionNft = contributionNft;
+        _agentNft = agentNft;
     }
 
     // The following functions are overrides required by Solidity.
@@ -96,9 +100,10 @@ contract AgentDAO is
 
         uint256 proposerVotes = getVotes(proposer, clock() - 1);
         uint256 votesThreshold = proposalThreshold();
+        address contributionNft = IAgentNft(_agentNft).getContributionNft();
         if (
             proposerVotes < votesThreshold &&
-            proposer != IContributionNft(_contributionNft).getAdmin()
+            proposer != IContributionNft(contributionNft).getAdmin()
         ) {
             revert GovernorInsufficientProposerVotes(
                 proposer,
@@ -167,6 +172,7 @@ contract AgentDAO is
         );
 
         if (!votedPreviously && hasVoted(proposalId, account)) {
+            ++_totalScore;
             _scores[account].push(
                 SafeCast.toUint48(block.number),
                 SafeCast.toUint208(scoreOf(account)) + 1
@@ -176,7 +182,21 @@ contract AgentDAO is
             }
         }
 
+        if (support == 1) {
+            _tryAutoExecute(proposalId);
+        }
+
         return weight;
+    }
+
+    // Auto execute when forVotes == totalSupply
+    function _tryAutoExecute(uint256 proposalId) internal {
+        (, uint256 forVotes, ) = proposalVotes(proposalId);
+        if (
+            forVotes == token().getPastTotalSupply(proposalSnapshot(proposalId))
+        ) {
+            execute(proposalId);
+        }
     }
 
     function _updateMaturity(
@@ -186,23 +206,48 @@ contract AgentDAO is
         bytes memory params
     ) internal {
         // Check is this a contribution proposal
-        address owner = IERC721(_contributionNft).ownerOf(proposalId);
+        address contributionNft = IAgentNft(_agentNft).getContributionNft();
+        address owner = IERC721(contributionNft).ownerOf(proposalId);
         if (owner == address(0)) {
             return;
         }
 
-        bool isModel = IContributionNft(_contributionNft).isModel(proposalId);
+        bool isModel = IContributionNft(contributionNft).isModel(proposalId);
         if (!isModel) {
             return;
         }
 
-        (uint256 maturity, uint8[] memory votes) = abi.decode(
-            params,
-            (uint256, uint8[])
-        );
+        uint8[] memory votes = abi.decode(params, (uint8[]));
+        uint256 maturity = _calcMaturity(proposalId, votes);
+
         _proposalMaturities[proposalId] += (maturity * weight);
 
         emit ValidatorEloRating(proposalId, account, maturity, votes);
+    }
+
+    function _calcMaturity(
+        uint256 proposalId,
+        uint8[] memory votes
+    ) internal view returns (uint256) {
+        address contributionNft = IAgentNft(_agentNft).getContributionNft();
+        address serviceNft = IAgentNft(_agentNft).getServiceNft();
+        uint256 virtualId = IContributionNft(contributionNft).tokenVirtualId(
+            proposalId
+        );
+        uint8 core = IContributionNft(contributionNft).getCore(proposalId);
+        uint256 coreService = IServiceNft(serviceNft).getCoreService(
+            virtualId,
+            core
+        );
+        // All services start with 100 maturity
+        uint256 maturity = 100;
+        if (coreService > 0) {
+            maturity = IServiceNft(serviceNft).getMaturity(coreService);
+            maturity = IEloCalculator(IAgentNft(_agentNft).getEloCalculator())
+                .battleElo(maturity, votes);
+        }
+
+        return maturity;
     }
 
     function getMaturity(uint256 proposalId) public view returns (uint256) {
@@ -223,5 +268,26 @@ contract AgentDAO is
 
     function quorumDenominator() public pure override returns (uint256) {
         return 10000;
+    }
+
+    function state(
+        uint256 proposalId
+    ) public view override(GovernorUpgradeable) returns (ProposalState) {
+        // Allow early execution when reached 100% for votes
+        ProposalState currentState = super.state(proposalId);
+        if (currentState == ProposalState.Active) {
+            (, uint256 forVotes, ) = proposalVotes(proposalId);
+            if (
+                forVotes ==
+                token().getPastTotalSupply(proposalSnapshot(proposalId))
+            ) {
+                return ProposalState.Succeeded;
+            }
+        }
+        return currentState;
+    }
+
+    function totalScore() public view override returns (uint256) {
+        return _totalScore;
     }
 }

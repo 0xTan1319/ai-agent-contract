@@ -1,24 +1,15 @@
 /*
 Test delegation with history
 */
-const { parseEther, toBeHex } = require("ethers/utils");
+const { parseEther } = require("ethers/utils");
 const { expect } = require("chai");
 const {
   loadFixture,
   mine,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
-const getExecuteCallData = (factory, proposalId) => {
-  return factory.interface.encodeFunctionData("executeApplication", [
-    proposalId,
-  ]);
-};
-
 describe("Delegation", function () {
   const PROPOSAL_THRESHOLD = parseEther("100000");
-  const QUORUM = parseEther("10000");
-  const PROTOCOL_DAO_VOTING_PERIOD = 300;
-  const MATURITY_SCORE = toBeHex(2000, 32); // 20%
 
   const genesisInput = {
     name: "Jessica",
@@ -33,131 +24,153 @@ describe("Delegation", function () {
     daoThreshold: 1000000000000000000000n,
   };
 
+  const getAccounts = async () => {
+    const [deployer, ipVault, founder, poorMan, trader, treasury] =
+      await ethers.getSigners();
+    return { deployer, ipVault, founder, poorMan, trader, treasury };
+  };
+
   async function deployBaseContracts() {
-    const [deployer] = await ethers.getSigners();
-    const veToken = await ethers.deployContract(
-      "veVirtualToken",
-      [deployer.address],
+    const { deployer, ipVault, treasury } = await getAccounts();
+
+    const virtualToken = await ethers.deployContract(
+      "VirtualToken",
+      [PROPOSAL_THRESHOLD, deployer.address],
       {}
     );
-    await veToken.waitForDeployment();
+    await virtualToken.waitForDeployment();
 
-    const demoToken = await ethers.deployContract(
-      "BMWToken",
-      [deployer.address],
-      {}
-    );
-    await demoToken.waitForDeployment();
-
-    const protocolDAO = await ethers.deployContract(
-      "VirtualProtocolDAO",
-      [veToken.target, 0, PROTOCOL_DAO_VOTING_PERIOD, PROPOSAL_THRESHOLD, 500],
-      {}
-    );
-    await protocolDAO.waitForDeployment();
-
-    const AgentNft = await ethers.getContractFactory("AgentNft");
-    const personaNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
+    const AgentNft = await ethers.getContractFactory("AgentNftV2");
+    const agentNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
     const contribution = await upgrades.deployProxy(
       await ethers.getContractFactory("ContributionNft"),
-      [personaNft.target],
+      [agentNft.target],
       {}
     );
 
     const service = await upgrades.deployProxy(
       await ethers.getContractFactory("ServiceNft"),
-      [personaNft.target, contribution.target, 7000n],
+      [agentNft.target, contribution.target, process.env.DATASET_SHARES],
       {}
     );
 
-    await personaNft.setContributionService(
-      contribution.target,
-      service.target
-    );
+    await agentNft.setContributionService(contribution.target, service.target);
 
-    const personaToken = await ethers.deployContract("AgentToken");
-    await personaToken.waitForDeployment();
-    const personaDAO = await ethers.deployContract("AgentDAO");
-    await personaDAO.waitForDeployment();
+    // Implementation contracts
+    const agentToken = await ethers.deployContract("AgentToken");
+    await agentToken.waitForDeployment();
+    const agentDAO = await ethers.deployContract("AgentDAO");
+    await agentDAO.waitForDeployment();
+    const agentVeToken = await ethers.deployContract("AgentVeToken");
+    await agentVeToken.waitForDeployment();
 
-    const tba = await ethers.deployContract("ERC6551Registry");
-
-    const personaFactory = await upgrades.deployProxy(
-      await ethers.getContractFactory("AgentFactory"),
+    const agentFactory = await upgrades.deployProxy(
+      await ethers.getContractFactory("AgentFactoryV2"),
       [
-        personaToken.target,
-        personaDAO.target,
-        tba.target,
-        demoToken.target,
-        personaNft.target,
-        parseEther("100000"),
-        5,
-        protocolDAO.target,
+        agentToken.target,
+        agentVeToken.target,
+        agentDAO.target,
+        process.env.TBA_REGISTRY,
+        virtualToken.target,
+        agentNft.target,
+        PROPOSAL_THRESHOLD,
         deployer.address,
       ]
     );
-
-    await personaNft.grantRole(
-      await personaNft.MINTER_ROLE(),
-      personaFactory.target
+    await agentFactory.waitForDeployment();
+    await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
+    const minter = await upgrades.deployProxy(await ethers.getContractFactory("Minter"), [
+      service.target,
+      contribution.target,
+      agentNft.target,
+      process.env.IP_SHARES,
+      process.env.IMPACT_MULTIPLIER,
+      ipVault.address,
+      agentFactory.target,
+      deployer.address,
+      process.env.MAX_IMPACT,
+    ]);
+    await minter.waitForDeployment();
+    await agentFactory.setMaturityDuration(86400 * 365 * 10); // 10years
+    await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
+    await agentFactory.setTokenAdmin(deployer.address);
+    await agentFactory.setTokenSupplyParams(
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.AGENT_TOKEN_LP_SUPPLY,
+      process.env.AGENT_TOKEN_VAULT_SUPPLY,
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.BOT_PROTECTION,
+      minter.target
+    );
+    await agentFactory.setTokenTaxParams(
+      process.env.TAX,
+      process.env.TAX,
+      process.env.SWAP_THRESHOLD,
+      treasury.address
     );
 
-    await demoToken.mint(deployer.address, PROPOSAL_THRESHOLD);
-    await demoToken.approve(personaFactory.target, PROPOSAL_THRESHOLD);
+    return { virtualToken, agentFactory, agentNft };
+  }
 
-    await personaFactory.proposePersona(
-      genesisInput.name,
-      genesisInput.symbol,
-      genesisInput.tokenURI,
-      genesisInput.cores,
-      genesisInput.tbaSalt,
-      genesisInput.tbaImplementation,
-      genesisInput.daoVotingPeriod,
-      genesisInput.daoThreshold
-    );
+  async function deployWithApplication() {
+    const base = await deployBaseContracts();
+    const { agentFactory, virtualToken } = base;
+    const { founder } = await getAccounts();
 
-    const filter = personaFactory.filters.NewApplication;
-    const events = await personaFactory.queryFilter(filter, -1);
+    // Prepare tokens for proposal
+    await virtualToken.mint(founder.address, PROPOSAL_THRESHOLD);
+    await virtualToken
+      .connect(founder)
+      .approve(agentFactory.target, PROPOSAL_THRESHOLD);
+
+    const tx = await agentFactory
+      .connect(founder)
+      .proposeAgent(
+        genesisInput.name,
+        genesisInput.symbol,
+        genesisInput.tokenURI,
+        genesisInput.cores,
+        genesisInput.tbaSalt,
+        genesisInput.tbaImplementation,
+        genesisInput.daoVotingPeriod,
+        genesisInput.daoThreshold
+      );
+
+    const filter = agentFactory.filters.NewApplication;
+    const events = await agentFactory.queryFilter(filter, -1);
     const event = events[0];
     const { id } = event.args;
+    return { applicationId: id, ...base };
+  }
 
-    // Create proposal
-    await veToken.oracleTransfer(
-      [ethers.ZeroAddress],
-      [deployer.address],
-      [parseEther("100000000")]
-    );
-    await veToken.delegate(deployer.address);
+  async function deployWithAgent() {
+    const base = await deployWithApplication();
+    const { agentFactory, applicationId } = base;
 
-    await protocolDAO.propose(
-      [personaFactory.target],
-      [0],
-      [getExecuteCallData(personaFactory, id)],
-      "Create Jessica"
-    );
+    const { founder } = await getAccounts();
+    await agentFactory
+      .connect(founder)
+      .executeApplication(applicationId, false);
 
-    const daoFilter = protocolDAO.filters.ProposalCreated;
-    const daoEvents = await protocolDAO.queryFilter(daoFilter, -1);
-    const daoEvent = daoEvents[0];
-    const daoProposalId = daoEvent.args[0];
-
-    await protocolDAO.castVote(daoProposalId, 1);
-    await mine(PROTOCOL_DAO_VOTING_PERIOD);
-
-    await protocolDAO.execute(daoProposalId);
-    const factoryFilter = personaFactory.filters.NewPersona;
-    const factoryEvents = await personaFactory.queryFilter(factoryFilter, -1);
+    const factoryFilter = agentFactory.filters.NewPersona;
+    const factoryEvents = await agentFactory.queryFilter(factoryFilter, -1);
     const factoryEvent = factoryEvents[0];
 
-    const { virtualId, token, dao } = factoryEvent.args;
-    const persona = { virtualId, token, dao };
+    const { virtualId, token, veToken, dao, tba, lp } = await factoryEvent.args;
 
-    const personaTokenContract = await ethers.getContractAt(
-      "AgentToken",
-      persona.token
-    );
-    return { personaTokenContract };
+    return {
+      ...base,
+      agent: {
+        virtualId,
+        token,
+        veToken,
+        dao,
+        tba,
+        lp,
+      },
+    };
   }
 
   before(async function () {
@@ -167,49 +180,42 @@ describe("Delegation", function () {
   });
 
   it("should be able to retrieve past delegates", async function () {
-    const { personaTokenContract } = await loadFixture(deployBaseContracts);
+    const { agent } = await loadFixture(deployWithAgent);
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
 
     const [account1, account2, account3] = this.accounts;
-    await personaTokenContract.delegate(account1);
+    await veToken.delegate(account1);
     mine(1);
     const block1 = await ethers.provider.getBlockNumber();
-    expect(await personaTokenContract.delegates(account1)).to.equal(account1);
+    expect(await veToken.delegates(account1)).to.equal(account1);
 
-    await personaTokenContract.delegate(account2);
+    await veToken.delegate(account2);
     mine(1);
     const block2 = await ethers.provider.getBlockNumber();
 
-    await personaTokenContract.delegate(account3);
+    await veToken.delegate(account3);
     mine(1);
     const block3 = await ethers.provider.getBlockNumber();
 
-    expect(
-      await personaTokenContract.getPastDelegates(account1, block2)
-    ).to.equal(account2);
-    expect(
-      await personaTokenContract.getPastDelegates(account1, block3)
-    ).to.equal(account3);
-    expect(
-      await personaTokenContract.getPastDelegates(account1, block1)
-    ).to.equal(account1);
-    expect(await personaTokenContract.delegates(account1)).to.equal(account3);
+    expect(await veToken.getPastDelegates(account1, block2)).to.equal(account2);
+    expect(await veToken.getPastDelegates(account1, block3)).to.equal(account3);
+    expect(await veToken.getPastDelegates(account1, block1)).to.equal(account1);
+    expect(await veToken.delegates(account1)).to.equal(account3);
   });
 
   it("should be able to retrieve past delegates when there are more than 5 checkpoints", async function () {
-    const { personaTokenContract } = await loadFixture(deployBaseContracts);
+    const { agent } = await loadFixture(deployWithAgent);
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     const blockNumber = await ethers.provider.getBlockNumber();
 
     const [account1, account2, account3] = this.accounts;
     for (let i = 0; i < 8; i++) {
-      await personaTokenContract.delegate(this.accounts[i]);
+      await veToken.delegate(this.accounts[i]);
     }
     await mine(1);
     for (let i = 0; i < 8; i++) {
       expect(
-        await personaTokenContract.getPastDelegates(
-          account1,
-          blockNumber + i + 1
-        )
+        await veToken.getPastDelegates(account1, blockNumber + i + 1)
       ).to.equal(this.accounts[i]);
     }
   });
