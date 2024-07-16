@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "./virtualPersona/IAgentNft.sol";
 
 contract AgentInference is
     Initializable,
@@ -18,22 +19,25 @@ contract AgentInference is
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     uint256 public minFees;
-    mapping(address => uint256) public fees;
+    mapping(uint256 => uint256) public fees; // Agent custom fees
+    mapping(uint256 => uint256) public inferenceCount; // Inference count per agent
 
     IERC20 public token;
+    IAgentNft public agentNft;
 
     event MinFeesUpdated(uint256 minFees);
-    event FeesUpdated(address indexed provider, uint256 fees);
+    event FeesUpdated(uint256 indexed agentId, uint256 fees);
     event Prompt(
         address indexed sender,
         bytes32 promptHash,
-        address provider,
+        uint256 agentId,
         uint256 cost
     );
 
     function initialize(
         address defaultAdmin_,
         address token_,
+        address agentNft_,
         uint256 minFees_
     ) external initializer {
         __AccessControl_init();
@@ -44,14 +48,15 @@ contract AgentInference is
 
         token = IERC20(token_);
         minFees = minFees_;
+        agentNft = IAgentNft(agentNft_);
     }
 
     function setFees(
-        address provider,
+        uint256 agentId,
         uint256 amount
     ) public onlyRole(ADMIN_ROLE) {
-        fees[provider] = amount;
-        emit FeesUpdated(provider, amount);
+        fees[agentId] = amount;
+        emit FeesUpdated(agentId, amount);
     }
 
     function setMinFees(uint256 amount) public onlyRole(ADMIN_ROLE) {
@@ -59,14 +64,28 @@ contract AgentInference is
         emit MinFeesUpdated(amount);
     }
 
-    function prompt(bytes32 promptHash, address provider) public nonReentrant {
+    function prompt(
+        bytes32 promptHash,
+        uint256[] memory agentIds
+    ) public nonReentrant {
         address sender = _msgSender();
-        require(
-            token.balanceOf(sender) >= fees[provider],
-            "Insufficient balance"
-        );
-        uint256 cost = fees[provider].max(minFees);
-        token.safeTransferFrom(sender, provider, cost);
-        emit Prompt(sender, promptHash, provider, cost);
+        uint256 total = 0;
+
+        for (uint256 i = 0; i < agentIds.length; i++) {
+            uint256 agentId = agentIds[i];
+            uint256 agentFees = fees[agentId].max(minFees);
+            total += agentFees;
+        }
+
+        require(token.balanceOf(sender) >= total, "Insufficient balance");
+
+        for (uint256 i = 0; i < agentIds.length; i++) {
+            uint256 agentId = agentIds[i];
+            uint256 agentFees = fees[agentId].max(minFees);
+            address agentTba = agentNft.virtualInfo(agentId).tba;
+            token.safeTransferFrom(sender, agentTba, agentFees);
+            inferenceCount[agentId]++;
+            emit Prompt(sender, promptHash, agentId, agentFees);
+        }
     }
 }
