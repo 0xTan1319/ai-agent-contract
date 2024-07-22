@@ -949,7 +949,7 @@ contract AgentToken is
             !isUnlimited(to_) &&
             // If this is a buy (from a liquidity pool), we apply if the to_
             // address isn't noted as unlimited:
-            (isLiquidityPool(from_) && !isUnlimited(to_))
+            isLiquidityPool(from_)
         ) {
             // Liquidity pools aren't always going to round cleanly. This can (and does)
             // mean that a limit of 5,000 tokens (for example) will trigger on a max holding
