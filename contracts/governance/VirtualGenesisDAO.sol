@@ -119,7 +119,9 @@ contract VirtualGenesisDAO is
             );
     }
 
-    function earlyExecute(uint256 proposalId) public onlyRole(EXECUTOR_ROLE) payable returns (uint256) {
+    function earlyExecute(
+        uint256 proposalId
+    ) public payable onlyRole(EXECUTOR_ROLE) returns (uint256) {
         (
             address[] memory targets,
             uint256[] memory values,
@@ -129,6 +131,7 @@ contract VirtualGenesisDAO is
 
         require(
             state(proposalId) == ProposalState.Active &&
+                _voteSucceeded(proposalId) &&
                 _quorumReached(proposalId) &&
                 !_earlyExecutions[proposalId],
             "Proposal not ready for early execution"
