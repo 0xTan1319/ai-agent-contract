@@ -100,6 +100,7 @@ contract AgentNftV2 is
         address pool,
         address token
     ) external onlyRole(MINTER_ROLE) returns (uint256) {
+        require(virtualId == _nextVirtualId, "Invalid virtualId");
         _nextVirtualId++;
         _mint(to, virtualId);
         _setTokenURI(virtualId, newTokenURI);
@@ -153,6 +154,7 @@ contract AgentNftV2 is
     }
 
     function initValidatorScore(uint256 virtualId, address validator) public {
+        require(isValidator(virtualId, validator), "Not a validator");
         _initValidatorScore(virtualId, validator);
     }
 
