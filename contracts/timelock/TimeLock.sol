@@ -16,7 +16,6 @@ contract TimeLock is BaseToken, ITimeLockDeposits {
     bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
     uint256 public constant MIN_LOCK_DURATION = 10 minutes;
-    bool public isAllowPositionStaking = true;
     bool public isAllowDeposits = true;
     bool public isAdminUnlock = false;
 
@@ -185,10 +184,6 @@ contract TimeLock is BaseToken, ITimeLockDeposits {
         address _account
     ) public view returns (uint256) {
         return depositsOf[_account].length;
-    }
-
-    function adjustPositionStaking() external onlyRole(ADMIN_ROLE) {
-        isAllowPositionStaking = !isAllowPositionStaking;
     }
 
     function adjustDeposits() external onlyRole(ADMIN_ROLE) {
