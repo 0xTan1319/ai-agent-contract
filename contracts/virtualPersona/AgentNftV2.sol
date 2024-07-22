@@ -153,11 +153,6 @@ contract AgentNftV2 is
         _initValidatorScore(virtualId, validator);
     }
 
-    function initValidatorScore(uint256 virtualId, address validator) public {
-        require(isValidator(virtualId, validator), "Not a validator");
-        _initValidatorScore(virtualId, validator);
-    }
-
     function _validatorScoreOf(
         uint256 virtualId,
         address account
