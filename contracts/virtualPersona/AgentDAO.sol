@@ -27,8 +27,6 @@ contract AgentDAO is
     mapping(address => Checkpoints.Trace208) private _scores;
     mapping(uint256 => uint256) private _proposalMaturities;
 
-    address private _contributionNft;
-
     error ERC5805FutureLookup(uint256 timepoint, uint48 clock);
 
     uint256 private _totalScore;
@@ -51,7 +49,6 @@ contract AgentDAO is
         __GovernorCountingSimple_init();
         __GovernorVotes_init(token);
         __GovernorVotesQuorumFraction_init(5100);
-        __GovernorCountingSimple_init();
         __GovernorStorage_init();
 
         _agentNft = agentNft;

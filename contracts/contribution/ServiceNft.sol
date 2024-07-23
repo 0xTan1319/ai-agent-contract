@@ -32,7 +32,6 @@ contract ServiceNft is
     mapping(uint256 tokenId => uint8 coreId) private _cores;
     mapping(uint256 tokenId => uint256 maturity) private _maturities;
     mapping(uint256 tokenId => uint256 impact) private _impacts;
-    mapping(uint256 tokenId => uint256 blockNumber) private _mintedAts;
 
     mapping(uint256 personaId => mapping(uint8 coreId => uint256 serviceId))
         private _coreServices; // Latest service NFT id for a core
@@ -50,6 +49,8 @@ contract ServiceNft is
         uint16 initialDatasetImpactWeight
     ) public initializer {
         __ERC721_init("Service", "VS");
+        __ERC721Enumerable_init();
+        __ERC721URIStorage_init();
         __Ownable_init(_msgSender());
         personaNft = initialAgentNft;
         contributionNft = initialContributionNft;
@@ -154,11 +155,6 @@ contract ServiceNft is
     function getImpact(uint256 tokenId) public view returns (uint256) {
         _requireOwned(tokenId);
         return _impacts[tokenId];
-    }
-
-    function getMintedAt(uint256 tokenId) public view returns (uint256) {
-        _requireOwned(tokenId);
-        return _mintedAts[tokenId];
     }
 
     function getCoreService(

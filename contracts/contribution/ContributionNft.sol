@@ -46,6 +46,9 @@ contract ContributionNft is
 
     function initialize(address thePersonaAddress) public initializer {
         __ERC721_init("Contribution", "VC");
+        __ERC721Enumerable_init();
+        __ERC721URIStorage_init();
+        
         personaNft = thePersonaAddress;
         _admin = _msgSender();
     }
