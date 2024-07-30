@@ -100,6 +100,7 @@ contract AgentNftV2 is
         address pool,
         address token
     ) external onlyRole(MINTER_ROLE) returns (uint256) {
+        require(virtualId == _nextVirtualId, "Invalid virtualId");
         _nextVirtualId++;
         _mint(to, virtualId);
         _setTokenURI(virtualId, newTokenURI);
@@ -116,6 +117,7 @@ contract AgentNftV2 is
 
         _stakingTokenToVirtualId[address(daoToken)] = virtualId;
         _addValidator(virtualId, founder);
+        _initValidatorScore(virtualId, founder);
         return virtualId;
     }
 
@@ -149,10 +151,6 @@ contract AgentNftV2 is
             return;
         }
         _addValidator(virtualId, validator);
-        _initValidatorScore(virtualId, validator);
-    }
-
-    function initValidatorScore(uint256 virtualId, address validator) public {
         _initValidatorScore(virtualId, validator);
     }
 
@@ -216,14 +214,14 @@ contract AgentNftV2 is
     }
 
     function totalStaked(uint256 virtualId) public view returns (uint256) {
-        return IERC20(virtualInfos[virtualId].token).totalSupply();
+        return IERC20(virtualLPs[virtualId].veToken).totalSupply();
     }
 
     function getVotes(
         uint256 virtualId,
         address validator
     ) public view returns (uint256) {
-        return IERC5805(virtualInfos[virtualId].token).getVotes(validator);
+        return IERC5805(virtualLPs[virtualId].veToken).getVotes(validator);
     }
 
     function getContributionNft() public view returns (address) {

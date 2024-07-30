@@ -4,11 +4,9 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IERC20Config.sol";
-import "./IConfigStructures.sol";
 import "./IErrors.sol";
 
 interface IAgentToken is
-    IConfigStructures,
     IERC20,
     IERC20Config,
     IERC20Metadata,

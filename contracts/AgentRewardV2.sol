@@ -116,13 +116,6 @@ contract AgentRewardV2 is
     // ----------------
     // Helper functions
     // ----------------
-    function getTotalStaked(
-        uint256 virtualId
-    ) public view returns (uint256 totalStaked) {
-        return
-            IERC20(IAgentNft(agentNft).virtualLP(virtualId).veToken)
-                .totalSupply();
-    }
 
     function getLPValue(uint256 virtualId) public view returns (uint256) {
         address lp = IAgentNft(agentNft).virtualLP(virtualId).pool;
@@ -193,14 +186,14 @@ contract AgentRewardV2 is
         RewardSettingsCheckpoints.RewardSettings memory settings
     ) private {
         uint256 agentRewardId = _nextAgentRewardId++;
+        IAgentNft nft = IAgentNft(agentNft);
 
-        uint256 totalStaked = getTotalStaked(virtualId);
+        uint256 totalStaked = nft.totalStaked(virtualId);
 
         uint256 stakerAmount = (amount * settings.stakerShares) / DENOMINATOR;
 
-        uint256 totalProposals = IAgentDAO(
-            IAgentNft(agentNft).virtualInfo(virtualId).dao
-        ).proposalCount();
+        uint256 totalProposals = IAgentDAO(nft.virtualInfo(virtualId).dao)
+            .proposalCount();
 
         _agentRewards[virtualId].push(
             AgentReward(
@@ -332,9 +325,7 @@ contract AgentRewardV2 is
         return _agentRewards[virtualId].length;
     }
 
-    function claimStakerRewards(
-        uint256 virtualId
-    ) public noReentrant {
+    function claimStakerRewards(uint256 virtualId) public noReentrant {
         address account = _msgSender();
         uint256 totalClaimable;
         uint256 numRewards;
@@ -349,12 +340,15 @@ contract AgentRewardV2 is
 
         IERC20(rewardToken).safeTransfer(account, totalClaimable);
 
-        emit StakerRewardClaimed(virtualId, account, numRewards, totalClaimable);
+        emit StakerRewardClaimed(
+            virtualId,
+            account,
+            numRewards,
+            totalClaimable
+        );
     }
 
-    function claimValidatorRewards(
-        uint256 virtualId
-    ) public noReentrant {
+    function claimValidatorRewards(uint256 virtualId) public noReentrant {
         address account = _msgSender();
         uint256 totalClaimable;
         uint256 numRewards;

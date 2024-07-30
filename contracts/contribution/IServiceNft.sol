@@ -30,8 +30,6 @@ interface IServiceNft {
         uint8 coreType
     ) external view returns (uint256[] memory);
 
-    function getMintedAt(uint256 tokenId) external view returns (uint256);
-
     event CoreServiceUpdated(
         uint256 virtualId,
         uint8 coreType,
