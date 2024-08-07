@@ -146,7 +146,7 @@ contract AgentNftV2 is
         return _stakingTokenToVirtualId[stakingToken];
     }
 
-    function addValidator(uint256 virtualId, address validator) public {
+    function addValidator(uint256 virtualId, address validator) public onlyRole(VALIDATOR_ADMIN_ROLE) {
         if (isValidator(virtualId, validator)) {
             return;
         }
