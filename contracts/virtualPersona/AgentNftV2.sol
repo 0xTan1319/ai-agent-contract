@@ -146,7 +146,7 @@ contract AgentNftV2 is
         return _stakingTokenToVirtualId[stakingToken];
     }
 
-    function addValidator(uint256 virtualId, address validator) public onlyRole(VALIDATOR_ADMIN_ROLE) {
+    function addValidator(uint256 virtualId, address validator) public {
         if (isValidator(virtualId, validator)) {
             return;
         }
@@ -321,5 +321,7 @@ contract AgentNftV2 is
         VirtualLP storage lp = virtualLPs[virtualId];
         lp.pool = pool;
         lp.veToken = veToken;
+
+        _stakingTokenToVirtualId[address(veToken)] = virtualId;
     }
 }
