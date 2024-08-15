@@ -32,6 +32,9 @@ const adminSigner = new ethers.Wallet(
       process.env.VIRTUAL_VETOKEN_IMPL,
       process.env.VIRTUAL_DAO_IMPL
     );
+
+    const nft = await ethers.getContractAt("AgentNftV2", process.env.VIRTUAL_NFT, adminSigner);
+    await nft.grantRole(await nft.ADMIN_ROLE(), contract.target);
   } catch (e) {
     console.log(e);
   }

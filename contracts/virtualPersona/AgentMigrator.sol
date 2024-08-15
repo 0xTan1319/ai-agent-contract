@@ -144,9 +144,15 @@ contract AgentMigrator is Ownable, Pausable {
                 oldDAO.proposalThreshold()
             )
         );
-
         // Update AgentNft
         _nft.migrateVirtual(id, dao, token, lp, veToken);
+
+        IERC20(lp).approve(veToken, type(uint256).max);
+        IAgentVeToken(veToken).stake(
+            IERC20(lp).balanceOf(address(this)),
+            founder,
+            founder
+        );
 
         migratedAgents[id] = true;
 
