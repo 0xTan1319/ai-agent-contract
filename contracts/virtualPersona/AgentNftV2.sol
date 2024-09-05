@@ -321,5 +321,7 @@ contract AgentNftV2 is
         VirtualLP storage lp = virtualLPs[virtualId];
         lp.pool = pool;
         lp.veToken = veToken;
+
+        _stakingTokenToVirtualId[address(veToken)] = virtualId;
     }
 }
