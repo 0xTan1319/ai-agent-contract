@@ -220,4 +220,8 @@ contract AgentMigrator is Ownable, Pausable {
     function unpause() external onlyOwner {
         super._unpause();
     }
+
+    function reset(uint256 id) external onlyOwner {
+        migratedAgents[id] = false;
+    }
 }
