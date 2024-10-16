@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC5805} from "@openzeppelin/contracts/interfaces/IERC5805.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./virtualPersona/IAgentNft.sol";
-import "./virtualPersona/IAgentToken.sol";
+import "./virtualPersona/IAgentVeToken.sol";
 import "./libs/RewardSettingsCheckpoints.sol";
 import "./contribution/IContributionNft.sol";
 import "./contribution/IServiceNft.sol";
@@ -284,7 +284,7 @@ contract AgentRewardV2 is
             address validator = nft.validatorAt(virtualId, i);
 
             // Get validator revenue by votes weightage
-            address stakingAddress = getVirtualTokenAddress(virtualId);
+            address stakingAddress = getVirtualTokenAddress(nft, virtualId);
             uint256 votes = IERC5805(stakingAddress).getVotes(validator);
             uint256 validatorRewards = (amount * votes) / totalStaked;
 
@@ -371,7 +371,7 @@ contract AgentRewardV2 is
     ) private view returns (uint256) {
         Reward memory reward = getReward(virtualId, SafeCast.toUint32(pos));
         MainReward memory mainReward = getMainReward(reward.mainIndex);
-        IAgentToken token = IAgentToken(stakingAddress);
+        IAgentVeToken token = IAgentVeToken(stakingAddress);
 
         address delegatee = token.getPastDelegates(
             account,
@@ -682,7 +682,7 @@ contract AgentRewardV2 is
     function getVirtualTokenAddress(
         IAgentNft nft,
         uint256 virtualId
-    ) public returns (address) {
+    ) public view returns (address) {
         address stakingAddress = prevTokens[virtualId];
         if (stakingAddress == address(0)) {
             stakingAddress = nft.virtualInfo(virtualId).token;

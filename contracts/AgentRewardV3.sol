@@ -13,7 +13,7 @@ import "./virtualPersona/IAgentNft.sol";
 import "./virtualPersona/IAgentToken.sol";
 import "./virtualPersona/IAgentDAO.sol";
 import "./virtualPersona/IAgentVeToken.sol";
-import "./libs/RewardSettingsCheckpoints.sol";
+import "./libs/RewardSettingsCheckpointsV2.sol";
 import "./contribution/IContributionNft.sol";
 import "./contribution/IServiceNft.sol";
 import "./libs/TokenSaver.sol";
@@ -27,7 +27,7 @@ contract AgentRewardV3 is
 {
     using Math for uint256;
     using SafeERC20 for IERC20;
-    using RewardSettingsCheckpoints for RewardSettingsCheckpoints.Trace;
+    using RewardSettingsCheckpointsV2 for RewardSettingsCheckpointsV2.Trace;
 
     uint256 private _nextAgentRewardId;
 
@@ -43,7 +43,7 @@ contract AgentRewardV3 is
     Reward[] private _rewards;
     mapping(uint256 virtualId => AgentReward[]) private _agentRewards;
 
-    RewardSettingsCheckpoints.Trace private _rewardSettings;
+    RewardSettingsCheckpointsV2.Trace private _rewardSettings;
 
     // Rewards ledger
     uint256 public protocolRewards;
@@ -67,7 +67,7 @@ contract AgentRewardV3 is
     function initialize(
         address rewardToken_,
         address agentNft_,
-        RewardSettingsCheckpoints.RewardSettings memory settings_
+        RewardSettingsCheckpointsV2.RewardSettings memory settings_
     ) external initializer {
         rewardToken = rewardToken_;
         agentNft = agentNft_;
@@ -79,14 +79,14 @@ contract AgentRewardV3 is
     function getRewardSettings()
         public
         view
-        returns (RewardSettingsCheckpoints.RewardSettings memory)
+        returns (RewardSettingsCheckpointsV2.RewardSettings memory)
     {
         return _rewardSettings.latest();
     }
 
     function getPastRewardSettings(
         uint32 timepoint
-    ) public view returns (RewardSettingsCheckpoints.RewardSettings memory) {
+    ) public view returns (RewardSettingsCheckpointsV2.RewardSettings memory) {
         uint32 currentTimepoint = SafeCast.toUint32(block.number);
         if (timepoint >= currentTimepoint) {
             revert ERC5805FutureLookup(timepoint, currentTimepoint);
@@ -141,7 +141,7 @@ contract AgentRewardV3 is
             amount
         );
 
-        RewardSettingsCheckpoints.RewardSettings
+        RewardSettingsCheckpointsV2.RewardSettings
             memory settings = getRewardSettings();
 
         uint256 protocolAmount = shouldShareWithProtocol
@@ -183,7 +183,7 @@ contract AgentRewardV3 is
         uint256 virtualId,
         uint256 rewardIndex,
         uint256 amount,
-        RewardSettingsCheckpoints.RewardSettings memory settings
+        RewardSettingsCheckpointsV2.RewardSettings memory settings
     ) private {
         uint256 agentRewardId = _nextAgentRewardId++;
         IAgentNft nft = IAgentNft(agentNft);
@@ -212,7 +212,7 @@ contract AgentRewardV3 is
     function _distributeProtocolRewards(
         uint256 amount
     ) private returns (uint256) {
-        RewardSettingsCheckpoints.RewardSettings
+        RewardSettingsCheckpointsV2.RewardSettings
             memory rewardSettings = _rewardSettings.latest();
         uint256 protocolShares = (amount * rewardSettings.protocolShares) /
             DENOMINATOR;
@@ -422,7 +422,7 @@ contract AgentRewardV3 is
     ) public onlyGov {
         _rewardSettings.push(
             SafeCast.toUint32(block.number),
-            RewardSettingsCheckpoints.RewardSettings(
+            RewardSettingsCheckpointsV2.RewardSettings(
                 protocolShares_,
                 stakerShares_
             )
