@@ -29,7 +29,7 @@ async function upgradeFactory(implementations, assetToken) {
   }
   await factory.setTokenAdmin(process.env.ADMIN);
   await factory.setTokenSupplyParams(
-    process.env.AGENT_TOKEN_LIMIT,
+    process.env.AGENT_TOKEN_SUPPLY,
     process.env.AGENT_TOKEN_LP_SUPPLY,
     process.env.AGENT_TOKEN_VAULT_SUPPLY,
     process.env.AGENT_TOKEN_LIMIT,
