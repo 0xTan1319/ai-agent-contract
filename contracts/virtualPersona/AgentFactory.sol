@@ -136,7 +136,7 @@ contract AgentFactoryV2 is
         tbaRegistry = tbaRegistry_;
         nft = nft_;
         applicationThreshold = applicationThreshold_;
-        _nextId = 1000000001;
+        _nextId = 1;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _vault = vault_;
     }

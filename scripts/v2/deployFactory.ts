@@ -8,16 +8,13 @@ const adminSigner = new ethers.Wallet(
 
 (async () => {
   try {
-    const args = require("../arguments/vipFactory");
+    const args = require("../arguments/personaFactoryArguments");
     const Contract = await ethers.getContractFactory("AgentFactoryV2");
     const contract = await upgrades.deployProxy(Contract, args, {
       initialOwner: process.env.CONTRACT_CONTROLLER,
     });
     console.log("AgentFactoryV2 deployed to:", contract.target);
-    // const contract = await ethers.getContractAt(
-    //   "AgentFactoryV2",
-    //   process.env.VIRTUAL_FACTORY_PREMIUM
-    // );
+
     const t = await contract.setTokenAdmin(process.env.ADMIN);
     await t.wait();
     const t2 = await contract.setTokenSupplyParams(
@@ -39,11 +36,18 @@ const adminSigner = new ethers.Wallet(
     await t3.wait();
     const t4 = await contract.setUniswapRouter(process.env.UNISWAP_ROUTER);
     await t4.wait();
-    const t5 = await contract.grantRole(await contract.WITHDRAW_ROLE(), process.env.OP)
-    await t5.wait()
-    
-    const nft = await ethers.getContractAt("AgentNftV2", process.env.VIRTUAL_NFT, adminSigner)
-    await nft.grantRole(await nft.MINTER_ROLE(), process.env.VIRTUAL_FACTORY_PREMIUM)
+    const t5 = await contract.grantRole(
+      await contract.WITHDRAW_ROLE(),
+      process.env.OP
+    );
+    await t5.wait();
+
+    const nft = await ethers.getContractAt(
+      "AgentNftV2",
+      process.env.VIRTUAL_NFT,
+      adminSigner
+    );
+    await nft.grantRole(await nft.MINTER_ROLE(), contract.target);
   } catch (e) {
     console.log(e);
   }
