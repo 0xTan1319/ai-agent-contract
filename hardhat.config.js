@@ -11,6 +11,7 @@ module.exports = {
   solidity: {
     version: "0.8.20",
     settings: {
+      viaIR: true,
       optimizer: {
         enabled: true,
         runs: 200,
@@ -73,8 +74,8 @@ module.exports = {
         vaultAccountIds: process.env.FIREBLOCKS_VAULT_ACCOUNT_IDS,
       },
     },
-    local:{
-      url: "http://127.0.0.1:8545"
+    local: {
+      url: "http://127.0.0.1:8545",
     },
     polygon: {
       url: "https://rpc-mainnet.maticvigil.com/",
@@ -88,5 +89,5 @@ module.exports = {
       url: "https://rpc.ankr.com/eth_goerli",
       accounts: [process.env.PRIVATE_KEY],
     },
-  }
+  },
 };
