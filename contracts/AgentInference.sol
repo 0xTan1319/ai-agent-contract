@@ -100,9 +100,13 @@ contract AgentInference is
 
         require(token.balanceOf(sender) >= total, "Insufficient balance");
 
+        uint256 prevAgentId = 0;
+        address agentTba = address(0);
         for (uint256 i = 0; i < agentIds.length; i++) {
             uint256 agentId = agentIds[i];
-            address agentTba = agentNft.virtualInfo(agentId).tba;
+            if(prevAgentId != agentId){
+                agentTba = agentNft.virtualInfo(agentId).tba;
+            }
             token.safeTransferFrom(sender, agentTba, amounts[i]);
 
             inferenceCount[agentId]++;
