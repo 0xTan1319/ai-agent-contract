@@ -102,9 +102,9 @@ contract AgentInference is
 
         uint256 prevAgentId = 0;
         address agentTba = address(0);
-        for (uint256 i = 0; i < agentIds.length; i++) {
+        for (uint256 i = 0; i < len; i++) {
             uint256 agentId = agentIds[i];
-            if(prevAgentId != agentId){
+            if (prevAgentId != agentId) {
                 agentTba = agentNft.virtualInfo(agentId).tba;
             }
             token.safeTransferFrom(sender, agentTba, amounts[i]);
