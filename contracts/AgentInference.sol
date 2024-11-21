@@ -76,4 +76,43 @@ contract AgentInference is
             emit Prompt(sender, promptHash, agentId, amounts[i], coreIds[i]);
         }
     }
+
+    function promptMulti(
+        bytes32[] memory promptHashes,
+        uint256[] memory agentIds,
+        uint256[] memory amounts,
+        uint8[][] memory coreIds
+    ) public nonReentrant {
+        address sender = _msgSender();
+        uint256 total = 0;
+        uint256 len = agentIds.length;
+
+        require(
+            len == amounts.length &&
+                len == coreIds.length &&
+                len == promptHashes.length,
+            "Invalid input"
+        );
+
+        for (uint256 i = 0; i < len; i++) {
+            total += amounts[i];
+        }
+
+        require(token.balanceOf(sender) >= total, "Insufficient balance");
+
+        for (uint256 i = 0; i < agentIds.length; i++) {
+            uint256 agentId = agentIds[i];
+            address agentTba = agentNft.virtualInfo(agentId).tba;
+            token.safeTransferFrom(sender, agentTba, amounts[i]);
+
+            inferenceCount[agentId]++;
+            emit Prompt(
+                sender,
+                promptHashes[i],
+                agentId,
+                amounts[i],
+                coreIds[i]
+            );
+        }
+    }
 }
