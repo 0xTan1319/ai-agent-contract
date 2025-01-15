@@ -27,7 +27,8 @@ interface IAgentFactoryV3 {
         address tbaImplementation,
         uint32 daoVotingPeriod,
         uint256 daoThreshold,
-        uint256 applicationThreshold_
+        uint256 applicationThreshold_,
+        address creator
     ) external returns (uint256);
 
     function executeBondingCurveApplication(

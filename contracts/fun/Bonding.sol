@@ -430,7 +430,8 @@ contract Bonding is
             _deployParams.tbaImplementation,
             _deployParams.daoVotingPeriod,
             _deployParams.daoThreshold,
-            assetBalance
+            assetBalance,
+            _token.creator
         );
 
         address agentToken = IAgentFactoryV3(agentFactory)
