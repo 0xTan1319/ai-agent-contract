@@ -516,7 +516,8 @@ contract AgentFactoryV3 is
         address tbaImplementation,
         uint32 daoVotingPeriod,
         uint256 daoThreshold,
-        uint256 applicationThreshold_
+        uint256 applicationThreshold_,
+        address creator
     ) public whenNotPaused onlyRole(BONDING_ROLE) returns (uint256) {
         address sender = _msgSender();
         require(
@@ -544,7 +545,7 @@ contract AgentFactoryV3 is
             "",
             ApplicationStatus.Active,
             applicationThreshold_,
-            sender,
+            creator,
             cores,
             proposalEndBlock,
             0,
